@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>拈鬮轉盤</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background-color: #cbd5e1;
+      border-radius: 10px;
+    }
+    .animate-spin-slow {
+      animation: spin 8s linear infinite;
+    }
+    @keyframes popup {
+      0% { transform: scale(0.8) translateY(20px); opacity: 0; }
+      100% { transform: scale(1) translateY(0); opacity: 1; }
+    }
+    .animate-popup {
+      animation: popup 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+    .lucide {
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+  </style>
+</head>
+<body class="min-h-[100dvh] bg-slate-50 text-slate-800 font-sans flex flex-col md:flex-row-reverse overflow-x-hidden">
+
+  <!-- Confetti Container -->
+  <div id="confetti-container" class="fixed inset-0 pointer-events-none z-[60] overflow-hidden hidden"></div>
+
+  <!-- --- FLOATING TOGGLE BUTTON (Visible when sidebar is closed) --- -->
+  <button id="floating-toggle-btn" class="fixed top-4 left-4 z-20 p-2 bg-white rounded-md shadow-md text-slate-500 hover:text-indigo-600 transition-colors hidden">
+    <svg class="lucide lucide-menu w-5 h-5" viewBox="0 0 24 24">
+      <line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="18" x2="20" y2="18"/>
+    </svg>
+  </button>
+
+  <!-- --- MAIN AREA: The Wheel (Now physically first in DOM for mobile top positioning) --- -->
+  <div class="flex-1 flex flex-col items-center justify-center p-8 md:p-16 bg-slate-100 relative overflow-hidden h-[60vh] md:h-[100dvh] transition-all duration-300 ease-in-out z-0">
+    
+    <!-- Winner Announcement Popup -->
+    <div id="winner-popup" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 hidden">
+      <div class="bg-white px-10 py-8 md:px-16 md:py-12 rounded-3xl shadow-2xl flex flex-col items-center animate-popup relative max-w-sm w-full text-center">
+        <svg class="lucide lucide-trophy w-16 h-16 text-yellow-500 mb-4" viewBox="0 0 24 24">
+          <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>
+        </svg>
+        <span class="text-sm text-slate-500 font-bold uppercase tracking-widest mb-2">Winner!</span>
+        <span id="winner-text" class="text-4xl md:text-5xl font-black text-slate-800 break-words w-full mb-8"></span>
+
+        <button id="close-winner-amen" class="mt-4 px-6 py-3 md:py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-lg md:text-xl font-bold transition-all w-full shadow-lg shadow-indigo-300 hover:shadow-xl active:scale-95 tracking-wide">
+          Amen
+        </button>
+      </div>
+    </div>
+
+    <!-- Wheel Wrapper -->
+    <div class="relative w-full max-w-2xl aspect-square flex items-center justify-center mt-8">
+      
+      <!-- Outer Wheel Ring -->
+      <div class="absolute inset-0 rounded-full border-[12px] md:border-[16px] border-slate-800 shadow-2xl z-0 pointer-events-none drop-shadow-2xl flex items-center justify-center">
+         <div class="w-[98%] h-[98%] rounded-full border-4 border-slate-700 opacity-50"></div>
+      </div>
+
+      <!-- Pointer (Slim & Red) -->
+      <div class="absolute -top-4 md:-top-6 left-1/2 transform -translate-x-1/2 z-20 flex flex-col items-center filter drop-shadow-md">
+        <div class="w-5 h-10 md:w-6 md:h-12 bg-red-500" style="clip-path: polygon(50% 100%, 0 0, 100% 0);"></div>
+      </div>
+
+      <!-- SVG Wheel Container -->
+      <div class="w-[95%] h-[95%] rounded-full overflow-hidden relative z-10 shadow-inner bg-white">
+         <div id="wheel-container" class="w-full h-full" style="transform: rotate(0deg); transition-property: transform;">
+          <svg id="wheel-svg" viewBox="0 0 100 100" class="w-full h-full"></svg>
+        </div>
+      </div>
+
+      <!-- Center Spin Button (150% Larger) -->
+      <button
+        id="spin-btn"
+        class="absolute z-30 w-32 h-32 md:w-44 md:h-44 bg-white rounded-full flex flex-col items-center justify-center shadow-[0_0_20px_rgba(0,0,0,0.3)] hover:scale-105 active:scale-95 transition-all disabled:opacity-80 disabled:hover:scale-100 disabled:cursor-not-allowed group border-[6px] border-slate-100"
+      >
+        <div class="absolute inset-2 md:inset-3 rounded-full border-[3px] md:border-4 border-dashed border-slate-200 group-hover:border-indigo-400 transition-colors animate-spin-slow"></div>
+        <span class="text-3xl md:text-4xl font-black text-slate-800 tracking-wider">拈鬮</span>
+      </button>
+    </div>
+
+    <div class="w-[80%] max-w-lg h-12 bg-black/10 rounded-[100%] mt-8 blur-xl"></div>
+  </div>
+
+  <!-- --- SIDEBAR: Controls & Settings (Now physically second in DOM) --- -->
+  <div id="sidebar" class="w-full md:w-[180px] bg-white border-t md:border-t-0 md:border-r border-slate-200 p-3 flex flex-col shadow-sm z-10 md:h-[100dvh] flex-shrink-0 transition-all duration-300 ease-in-out origin-left overflow-hidden">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-1.5 flex-1 min-w-0">
+        <svg class="lucide lucide-refresh-cw w-4 h-4 text-indigo-600 flex-shrink-0" viewBox="0 0 24 24">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
+        </svg>
+        <h1 class="text-sm font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 truncate">
+          拈鬮轉盤
+        </h1>
+      </div>
+      <button id="sidebar-toggle-btn" class="p-1 text-slate-400 hover:text-indigo-600 rounded hover:bg-slate-100 transition-colors flex-shrink-0 ml-1">
+        <svg class="lucide lucide-panel-left-close w-4 h-4" viewBox="0 0 24 24">
+          <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><path d="M9 3v18"/><path d="m16 15-3-3 3-3"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Add Item Form (Compact) -->
+    <form id="add-item-form" class="mb-3 pr-1">
+      <label class="block text-[11px] font-semibold text-slate-600 mb-1">特別嘉賓</label>
+      <div class="flex gap-1">
+        <input
+          type="text"
+          id="new-item-input"
+          class="flex-1 px-1.5 py-1 bg-slate-100 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:bg-white transition-all text-xs min-w-0"
+        />
+        <button 
+          type="submit"
+          id="add-item-btn"
+          class="p-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+        >
+          <svg class="lucide lucide-plus w-3.5 h-3.5" viewBox="0 0 24 24">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        </button>
+      </div>
+    </form>
+
+    <!-- List Area -->
+    <div class="flex-1 flex flex-col min-h-0">
+      <div class="flex items-center justify-between mb-1 pr-1">
+        <label id="list-counter" class="block text-[11px] font-semibold text-slate-600">青職排名單 (0)</label>
+      </div>
+      <ul id="items-list" class="space-y-0.5 overflow-y-auto pr-1 custom-scrollbar flex-1">
+        <!-- List items injected via JS -->
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    const DEFAULT_COLORS = [
+      '#ef4444', '#f97316', '#f59e0b', '#84cc16', 
+      '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', 
+      '#d946ef', '#f43f5e'
+    ];
+
+    const initialNames = ['永新', '穗華', '子軒', '欣儀', '信騰', '婉瑜', '明輝', '依倫', '敬凱', '瀚煜', '怡安', '佲雨', '宜彤', '家淇', '浩宣', '鴻霖', '恩榮', '以新', '昱翔', '舜生'];
+
+    let items = initialNames.map((text, i) => ({
+      id: Date.now() + i,
+      text: text,
+      color: DEFAULT_COLORS[i % DEFAULT_COLORS.length]
+    }));
+
+    let isSpinning = false;
+    let rotation = 0;
+    let currentWinner = null;
+    let confettiFrameId = null;
+    let confettiTimer = null;
+
+    const wheelSvg = document.getElementById('wheel-svg');
+    const wheelContainer = document.getElementById('wheel-container');
+    const itemsList = document.getElementById('items-list');
+    const listCounter = document.getElementById('list-counter');
+    const addItemForm = document.getElementById('add-item-form');
+    const newItemInput = document.getElementById('new-item-input');
+    const spinBtn = document.getElementById('spin-btn');
+    const addItemBtn = document.getElementById('add-item-btn');
+    const winnerPopup = document.getElementById('winner-popup');
+    const winnerText = document.getElementById('winner-text');
+    const closeWinnerAmen = document.getElementById('close-winner-amen');
+    const confettiContainer = document.getElementById('confetti-container');
+    const sidebar = document.getElementById('sidebar');
+    const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn');
+    const floatingToggleBtn = document.getElementById('floating-toggle-btn');
+
+    // Sidebar Toggle Logic
+    let isSidebarOpen = true;
+
+    function toggleSidebar() {
+      isSidebarOpen = !isSidebarOpen;
+      
+      if (isSidebarOpen) {
+        // Open sidebar: Remove hidden on mobile, restore flex and width on desktop
+        sidebar.classList.remove('hidden', 'md:flex', 'md:w-0', 'md:p-0', 'md:border-none', 'opacity-0', 'pointer-events-none');
+        sidebar.classList.add('flex', 'md:w-[180px]', 'md:border-r', 'opacity-100');
+        floatingToggleBtn.classList.add('hidden');
+      } else {
+        // Close sidebar: Hide entirely on mobile, shrink width to 0 on desktop
+        sidebar.classList.remove('flex', 'md:w-[180px]', 'md:border-r', 'opacity-100');
+        sidebar.classList.add('hidden', 'md:flex', 'md:w-0', 'md:p-0', 'md:border-none', 'opacity-0', 'pointer-events-none');
+        floatingToggleBtn.classList.remove('hidden');
+      }
+    }
+
+    sidebarToggleBtn.addEventListener('click', toggleSidebar);
+    floatingToggleBtn.addEventListener('click', toggleSidebar);
+
+    function polarToCartesian(centerX, centerY, radius, angleInDegrees) {
+      const angleInRadians = (angleInDegrees - 90) * (Math.PI / 180.0);
+      return {
+        x: centerX + radius * Math.cos(angleInRadians),
+        y: centerY + radius * Math.sin(angleInRadians)
+      };
+    }
+
+    function describeArc(x, y, radius, startAngle, endAngle) {
+      const start = polarToCartesian(x, y, radius, endAngle);
+      const end = polarToCartesian(x, y, radius, startAngle);
+      const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
+      return [
+        "M", start.x, start.y,
+        "A", radius, radius, 0, largeArcFlag, 0, end.x, end.y,
+        "L", x, y,
+        "Z"
+      ].join(" ");
+    }
+
+    function renderWheel() {
+      if (items.length === 0) {
+        wheelSvg.innerHTML = '';
+        return;
+      }
+      const anglePerItem = 360 / items.length;
+      let svgContent = '';
+
+      items.forEach((item, index) => {
+        const startAngle = index * anglePerItem;
+        const endAngle = (index + 1) * anglePerItem;
+        const midAngle = startAngle + (anglePerItem / 2);
+        const pathData = describeArc(50, 50, 50, startAngle, endAngle);
+        
+        // Larger fonts for wheel
+        const fontSize = items.length > 12 ? "5" : items.length > 8 ? "6.5" : "8";
+        const textTruncated = item.text.length > 15 ? item.text.substring(0, 12) + '...' : item.text;
+
+        svgContent += `
+          <g>
+            <path d="${pathData}" fill="${item.color}" stroke="rgba(0,0,0,0.1)" stroke-width="0.5" />
+            <g transform="rotate(${midAngle} 50 50)">
+              <text x="50" y="12" text-anchor="middle" alignment-baseline="middle" fill="white" font-size="${fontSize}" font-weight="bold" class="drop-shadow-md" style="text-shadow: 0px 1px 3px rgba(0,0,0,0.4); user-select: none;">
+                ${textTruncated}
+              </text>
+            </g>
+          </g>
+        `;
+      });
+
+      wheelSvg.innerHTML = svgContent;
+      spinBtn.disabled = isSpinning || items.length < 2;
+    }
+
+    function renderList() {
+      listCounter.textContent = `青職排名單 (${items.length})`;
+      itemsList.innerHTML = '';
+
+      items.forEach(item => {
+        const li = document.createElement('li');
+        li.className = "flex items-center justify-between py-1 px-1.5 bg-slate-50 border border-slate-200 rounded group hover:border-slate-300 transition-colors text-xs";
+        li.innerHTML = `
+          <div class="flex items-center gap-1.5 overflow-hidden">
+            <div class="w-2.5 h-2.5 rounded-full flex-shrink-0 border border-black/10" style="background-color: ${item.color}"></div>
+            <span class="truncate font-medium text-slate-700">${item.text}</span>
+          </div>
+          <button class="remove-btn text-slate-400 hover:text-red-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-0.5" data-id="${item.id}" ${isSpinning ? 'disabled' : ''}>
+            <svg class="lucide lucide-trash-2 w-3.5 h-3.5" viewBox="0 0 24 24">
+              <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+            </svg>
+          </button>
+        `;
+
+        li.querySelector('.remove-btn').addEventListener('click', () => {
+          if (isSpinning) return;
+          if (items.length <= 2) {
+            alert("需要至少兩個選項！");
+            return;
+          }
+          items = items.filter(i => i.id !== item.id);
+          renderList();
+          renderWheel();
+        });
+
+        itemsList.appendChild(li);
+      });
+    }
+
+    addItemForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const text = newItemInput.value.trim();
+      if (!text || isSpinning) return;
+
+      const newColor = DEFAULT_COLORS[items.length % DEFAULT_COLORS.length];
+      items.push({ id: Date.now(), text, color: newColor });
+      newItemInput.value = '';
+      
+      renderList();
+      renderWheel();
+    });
+
+    newItemInput.addEventListener('input', () => {
+      addItemBtn.disabled = isSpinning || !newItemInput.value.trim();
+    });
+
+    spinBtn.addEventListener('click', () => {
+      if (isSpinning || items.length < 2) return;
+      
+      isSpinning = true;
+      currentWinner = null;
+      renderList(); 
+      newItemInput.disabled = true;
+      addItemBtn.disabled = true;
+      spinBtn.disabled = true;
+
+      const extraSpins = Math.floor(Math.random() * 5) + 5; 
+      const randomDegree = Math.floor(Math.random() * 360);
+      rotation += (extraSpins * 360 + randomDegree);
+
+      wheelContainer.style.transitionDuration = '5000ms';
+      wheelContainer.style.transitionTimingFunction = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
+      wheelContainer.style.transform = `rotate(${rotation}deg)`;
+
+      setTimeout(() => {
+        isSpinning = false;
+        
+        const normalizedRotation = rotation % 360;
+        const pointerAngle = (360 - normalizedRotation) % 360;
+        const anglePerItem = 360 / items.length;
+        const winningIndex = Math.floor(pointerAngle / anglePerItem);
+        
+        currentWinner = items[winningIndex];
+        
+        winnerText.textContent = currentWinner.text;
+        winnerText.style.color = currentWinner.color;
+        winnerPopup.classList.remove('hidden');
+        
+        startConfetti();
+        
+      }, 5000);
+    });
+
+    function closeWinner() {
+      items = items.filter(item => item.id !== currentWinner.id);
+      currentWinner = null;
+      
+      winnerPopup.classList.add('hidden');
+      newItemInput.disabled = false;
+      addItemBtn.disabled = !newItemInput.value.trim();
+      
+      renderList();
+      renderWheel();
+    }
+
+    closeWinnerAmen.addEventListener('click', closeWinner);
+
+    function startConfetti() {
+      confettiContainer.innerHTML = '';
+      confettiContainer.classList.remove('hidden');
+      
+      const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'];
+      let particles = Array.from({ length: 100 }).map((_, i) => ({
+        id: i,
+        x: Math.random() * 100,
+        y: -20 - Math.random() * 100,
+        size: Math.random() * 10 + 5,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        speed: Math.random() * 3 + 2,
+        wobble: Math.random() * 10,
+        wobbleSpeed: Math.random() * 0.1 + 0.05,
+        angle: Math.random() * 360,
+        rotationSpeed: Math.random() * 10 - 5,
+        element: document.createElement('div')
+      }));
+
+      particles.forEach(p => {
+        p.element.className = 'absolute opacity-80 rounded-sm';
+        p.element.style.backgroundColor = p.color;
+        p.element.style.width = `${p.size}px`;
+        p.element.style.height = `${p.size * 1.5}px`;
+        confettiContainer.appendChild(p.element);
+      });
+
+      let time = 0;
+      function animate() {
+        time += 1;
+        particles.forEach(p => {
+          p.y += p.speed;
+          if (p.y > 120) p.y = -10;
+          p.angle += p.rotationSpeed;
+          p.element.style.left = `${p.x + Math.sin(time * p.wobbleSpeed) * 0.5}%`;
+          p.element.style.top = `${p.y}%`;
+          p.element.style.transform = `rotate(${p.angle}deg)`;
+        });
+        confettiFrameId = requestAnimationFrame(animate);
+      }
+
+      animate();
+
+      if (confettiTimer) clearTimeout(confettiTimer);
+      confettiTimer = setTimeout(() => {
+        cancelAnimationFrame(confettiFrameId);
+        confettiContainer.classList.add('hidden');
+        confettiContainer.innerHTML = '';
+      }, 3000);
+    }
+
+    renderList();
+    renderWheel();
+  </script>
+</body>
+</html>
