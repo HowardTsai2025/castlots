@@ -155,7 +155,7 @@
       '#d946ef', '#f43f5e'
     ];
 
-    const initialNames = ['永新', '穗華', '子軒', '欣儀', '信騰', '婉瑜', '明輝', '依倫', '敬凱', '瀚煜', '怡安', '佲雨', '宜彤', '家淇', '浩宣', '鴻霖', '恩榮', '以新', '昱翔', '舜生'];
+    const initialNames = ['永新', '穗華', '子軒', '欣儀', '信騰', '婉瑜', '明輝', '依倫', '敬凱', '瀚煜', '怡安', '佲雨', '宜彤', '家淇', '映涵', '浩宣', '鴻霖', '恩榮', '以新', '昱翔', '舜生'];
 
     let items = initialNames.map((text, i) => ({
       id: Date.now() + i,
@@ -411,7 +411,7 @@
         cancelAnimationFrame(confettiFrameId);
         confettiContainer.classList.add('hidden');
         confettiContainer.innerHTML = '';
-      }, 3000);
+      }, 1500);
     }
 
     renderList();
