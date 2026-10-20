@@ -241,17 +241,16 @@
         const midAngle = startAngle + (anglePerItem / 2);
         const pathData = describeArc(50, 50, 50, startAngle, endAngle);
         
-        // Larger fonts for wheel
-        const fontSize = items.length > 12 ? "5" : items.length > 8 ? "6.5" : "8";
-        const textTruncated = item.text.length > 15 ? item.text.substring(0, 12) + '...' : item.text;
+        // Names are written vertically along each slice (rim toward center) so neighbours never collide
+        const fontSize = items.length > 20 ? 5.5 : items.length > 12 ? 6 : 7;
+        const chars = Array.from(item.text.length > 6 ? item.text.substring(0, 5) + '…' : item.text);
+        const charsSvg = chars.map((ch, i) => `
+              <text x="50" y="${8 + fontSize / 2 + i * fontSize * 1.05}" text-anchor="middle" dominant-baseline="central" fill="white" font-size="${fontSize}" font-weight="bold" style="text-shadow: 0px 1px 3px rgba(0,0,0,0.4); user-select: none;">${ch}</text>`).join('');
 
         svgContent += `
           <g>
-            <path d="${pathData}" fill="${item.color}" stroke="rgba(0,0,0,0.1)" stroke-width="0.5" />
-            <g transform="rotate(${midAngle} 50 50)">
-              <text x="50" y="12" text-anchor="middle" alignment-baseline="middle" fill="white" font-size="${fontSize}" font-weight="bold" class="drop-shadow-md" style="text-shadow: 0px 1px 3px rgba(0,0,0,0.4); user-select: none;">
-                ${textTruncated}
-              </text>
+            <path d="${pathData}" fill="${item.color}" stroke="rgba(255,255,255,0.7)" stroke-width="0.4" />
+            <g transform="rotate(${midAngle} 50 50)">${charsSvg}
             </g>
           </g>
         `;
